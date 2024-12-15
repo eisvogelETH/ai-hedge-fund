@@ -1,18 +1,15 @@
 from typing import Annotated, Any, Dict, Sequence, TypedDict
-
 import operator
 from langchain_core.messages import BaseMessage, HumanMessage
 from langchain_core.prompts import ChatPromptTemplate
-from langchain_openai.chat_models import ChatOpenAI
+from langchain_community.llms import Ollama
 from langgraph.graph import END, StateGraph
-
 from src.tools import calculate_bollinger_bands, calculate_intrinsic_value, calculate_macd, calculate_obv, calculate_rsi, get_cash_flow_statements, get_financial_metrics, get_insider_trades, get_market_cap, get_prices, prices_to_df
-
 import argparse
 from datetime import datetime
 import json
 
-llm = ChatOpenAI(model="gpt-4o")
+llm = Ollama(model="llama2",base_url="http://ollama:11434")
 
 def merge_dicts(a: Dict[str, Any], b: Dict[str, Any]) -> Dict[str, Any]:
     return {**a, **b}
@@ -58,9 +55,7 @@ def market_data_agent(state: AgentState):
     # Get the insider trades
     insider_trades = get_insider_trades(
         ticker=data["ticker"], 
-        start_date=start_date, 
-        end_date=end_date,
-        limit=5,
+        limit=10,
     )
 
     # Get the market cap
@@ -287,25 +282,6 @@ def fundamentals_agent(state: AgentState):
         "signal": signals[3],
         "details": f"P/E: {pe_ratio:.2f}, P/B: {pb_ratio:.2f}, P/S: {ps_ratio:.2f}"
     }
-
-    # 5. Calculate intrinsic value and compare to market cap
-    free_cash_flow = cash_flow_statement.get('free_cash_flow')
-    intrinsic_value = calculate_intrinsic_value(
-        free_cash_flow=free_cash_flow,
-        growth_rate=metrics["earnings_growth"],
-        discount_rate=0.10,
-        terminal_growth_rate=0.03,
-        num_years=5,
-    )
-    if market_cap < intrinsic_value:
-        signals.append('bullish')
-    else:
-        signals.append('bearish')
-
-    reasoning["Intrinsic_Value"] = {
-        "signal": signals[4],
-        "details": f"Intrinsic Value: ${intrinsic_value:,.2f}, Market Cap: ${market_cap:,.2f}"
-    }
     
     # Determine overall signal
     bullish_signals = signals.count('bullish')
@@ -359,11 +335,11 @@ def sentiment_agent(state: AgentState):
                 You are a market sentiment analyst.
                 Your job is to analyze the insider trades of a company and provide a sentiment analysis.
                 The insider trades are a list of transactions made by company insiders.
-                - If the insider is buying, the sentiment may be bullish. 
-                - If the insider is selling, the sentiment may be bearish.
-                - If the insider is neutral, the sentiment may be neutral.
-                The sentiment is amplified if the insider is buying or selling a large amount of shares.
-                Also, the sentiment is amplified if the insider is a high-level executive (e.g. CEO, CFO, etc.) or board member.
+                - If the insider is buying, the sentiment is very likely bullish.
+                - If the insider is selling, the sentiment is very likely bearish.
+                The sentiment may be amplified if the insider is buying or selling a large amount of shares.
+                The sentiment is also influenced by the role of the insider:
+                - If the insider is a high-level executive (e.g. CEO, CFO, etc.) or board member, the sentiment is more significant.
                 For each insider trade, provide the following in your output (as a JSON):
                 "sentiment": <bullish | bearish | neutral>,
                 "reasoning": <concise explanation of the decision>
@@ -372,10 +348,10 @@ def sentiment_agent(state: AgentState):
             (
                 "human",
                 """
-                Based on the following insider trades, provide your sentiment analysis.
+                Based on the following insider trades, provide your sentiment analysis. 
                 {insider_trades}
 
-                Only include the sentiment and reasoning in your JSON output.  Do not include any JSON markdown.
+                Only include the sentiment and reasoning in your JSON output. Do not include any JSON markdown.
                 """
             ),
         ]
@@ -391,9 +367,9 @@ def sentiment_agent(state: AgentState):
 
     # Extract the sentiment and reasoning from the result, safely
     try:
-        message_content = json.loads(result.content)
+        message_content = json.loads(json.dumps(result))  # Try parsing JSON if the response is JSON-formatted
     except json.JSONDecodeError:
-        message_content = {"sentiment": "neutral", "reasoning": "Unable to parse JSON output of market sentiment analysis"}
+        message_content = {"sentiment": "neutral", "reasoning": "Unable to parse JSON output of market sentiment analysis"}  # Otherwise, just use the string response
 
     # Create the market sentiment message
     message = HumanMessage(
@@ -420,6 +396,7 @@ def risk_management_agent(state: AgentState):
     quant_message = next(msg for msg in state["messages"] if msg.name == "quant_agent")
     fundamentals_message = next(msg for msg in state["messages"] if msg.name == "fundamentals_agent")
     sentiment_message = next(msg for msg in state["messages"] if msg.name == "sentiment_agent")
+
     # Create the prompt template
     template = ChatPromptTemplate.from_messages(
         [
@@ -467,7 +444,7 @@ def risk_management_agent(state: AgentState):
     # Invoke the LLM
     result = llm.invoke(prompt)
     message = HumanMessage(
-        content=result.content,
+        content=result,
         name="risk_management_agent",
     )
 
@@ -546,7 +523,7 @@ def portfolio_management_agent(state: AgentState):
 
     # Create the portfolio management message
     message = HumanMessage(
-        content=result.content,
+        content=result,
         name="portfolio_management",
     )
 
