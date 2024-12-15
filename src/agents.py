@@ -44,6 +44,8 @@ def market_data_agent(state: AgentState):
         end_date=end_date,
     )
 
+    prices = prices.get('prices', []) #Structured as List like the previous Output
+
     # Get the financial metrics
     financial_metrics = get_financial_metrics(
         ticker=data["ticker"], 
@@ -65,11 +67,10 @@ def market_data_agent(state: AgentState):
 
     # Get the cash flow statements
     cash_flow_statements = get_cash_flow_statements(
-        ticker=data["ticker"], 
-        end_date=end_date,
-        period='ttm',
-        limit=1,
+        ticker=data["ticker"]
     )
+    
+    cash_flow_statements = cash_flow_statements.get('cash_flow_statements', [])
 
     return {
         "messages": messages,
