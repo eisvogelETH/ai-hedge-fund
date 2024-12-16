@@ -91,7 +91,6 @@ def get_financial_metrics(
             else None
         )
 
-
         # Assemble data into required structure
         metrics = {
             "ticker": ticker,
@@ -129,7 +128,7 @@ def get_financial_metrics(
         print(f"Error fetching metrics for {ticker}: {e}")
         return None
 
-def get_cash_flow_statements(ticker: str):
+def get_cash_flow_statements(ticker: str) -> List[Dict[str, Any]]:
     try:
         # Fetch stock data
         stock = yf.Ticker(ticker)
@@ -174,16 +173,17 @@ def get_cash_flow_statements(ticker: str):
             data["ticker"] = ticker
         
         # Return data in desired format
-        return {
-            "cash_flow_statements": [data]
-        }
-    
+        return [data]
+
     except Exception as e:
         # Catch all other errors and log
         print(f"An error occurred while fetching cash flow data: {e}")
         return None
 
-def get_insider_trades(ticker, limit=10):
+def get_insider_trades(
+    ticker: str,
+    limit: int = 10,
+) -> List[Dict[str, Any]]:
     try:
         # Fetch the data for the given ticker
         stock = yf.Ticker(ticker)
@@ -212,9 +212,7 @@ def get_insider_trades(ticker, limit=10):
         insider_data = insider_data.head(limit)
 
         # Structure the data to match your required JSON format
-        insider_trades = {
-            "insider_trades": []
-        }
+        insider_trades = []
         
         # Loop through insider transactions and structure the data
         for _, row in insider_data.iterrows():
@@ -243,10 +241,10 @@ def get_insider_trades(ticker, limit=10):
                 "security_title": "Common Stock",  # Assuming this is always the case
                 "transaction_type": transaction_type  # Added field
             }
-            insider_trades["insider_trades"].append(trade)
-        
+            insider_trades.append(trade)
+
         return insider_trades
-    
+
     except ValueError as e:
         # If no insider trades are found or another error occurs, raise an exception
         raise ValueError("No insider trades returned") from e
@@ -254,7 +252,7 @@ def get_insider_trades(ticker, limit=10):
         # General exception handling
         raise Exception(f"An error occurred while processing insider data: {str(e)}") from e
 
-def get_market_cap(ticker: str) -> float:
+def get_market_cap(ticker: str) -> List[Dict[str, Any]]:
     try:
         # Fetch the stock data
         stock = yf.Ticker(ticker)

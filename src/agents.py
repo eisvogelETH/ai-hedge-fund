@@ -64,8 +64,6 @@ def market_data_agent(state: AgentState):
     cash_flow_statements = get_cash_flow_statements(
         ticker=data["ticker"]
     )
-    
-    cash_flow_statements = cash_flow_statements.get('cash_flow_statements', [])
 
     return {
         "messages": messages,
@@ -401,8 +399,6 @@ def risk_management_agent(state: AgentState):
                 """You are a risk management specialist.
                 Your job is to take a look at the trading analysis and
                 evaluate portfolio exposure and recommend position sizing. 
-                Please take for the Sentiment Analysis Trading Signal into account that the
-                sentiment of high-level executives weighs more for the decision of the overall sentiment.
                 Provide the following in your output (as a JSON):
                 "max_position_size": <float greater than 0>,
                 "risk_score": <integer between 1 and 10>,
