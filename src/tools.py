@@ -7,30 +7,127 @@ from datetime import datetime, timedelta
 import json
 
 def get_financial_metrics(
-    ticker: str,
-    report_period: str,
-    period: str = 'ttm',
-    limit: int = 1
+    ticker: str
 ) -> List[Dict[str, Any]]:
-    """Fetch financial metrics from the API."""
-    headers = {"X-API-KEY": os.environ.get("FINANCIAL_DATASETS_API_KEY")}
-    url = (
-        f"https://api.financialdatasets.ai/financial-metrics/"
-        f"?ticker={ticker}"
-        f"&report_period_lte={report_period}"
-        f"&limit={limit}"
-        f"&period={period}"
-    )
-    response = requests.get(url, headers=headers)
-    if response.status_code != 200:
-        raise Exception(
-            f"Error fetching data: {response.status_code} - {response.text}"
+    # Initialize yfinance Ticker
+    stock = yf.Ticker(ticker)
+    try:
+        # Fetch data from yfinance
+        info = stock.info
+        financials = stock.financials
+        balance_sheet = stock.balance_sheet
+        cashflow = stock.cashflow
+
+        # Data from Stock Info
+        cash = info.get('totalCash', None)
+        revenue = info.get('totalRevenue', None)
+        shares_outstanding = info.get("sharesOutstanding", None)
+        market_cap = info.get('marketCap', None)
+        enterprise_value = info.get('enterpriseValue', None)
+        ebitda = info.get('ebitda', None)
+        price_to_earnings_ratio = info.get('trailingPE', None)
+        price_to_book_ratio = info.get('priceToBook', None)
+        price_to_sales_ratio = info.get('priceToSalesTrailing12Months', None)
+        enterprise_value_to_ebitda_ratio = info.get('enterpriseToEbitda', None)
+        enterprise_value_to_revenue_ratio = info.get('enterpriseToRevenue', None)
+        gross_margin = info.get('grossMargins', None)
+        operating_margin = info.get('operatingMargins', None)
+        net_margin = info.get('profitMargins', None)
+        return_on_equity = info.get('returnOnEquity', None)
+        return_on_assets = info.get('returnOnAssets', None)
+        revenue_growth = info.get('revenueGrowth', None)
+        earnings_growth = info.get('earningsGrowth', None)
+        payout_ratio = info.get('payoutRatio', None)
+        earnings_per_share = info.get('trailingEps', None)
+        book_value_per_share = info.get('bookValue', None)
+
+        # Data from Financials
+        operating_income = financials.loc['EBIT'].iloc[0] if 'EBIT' in financials.index else None
+        cost_of_revenue = financials.loc['Cost Of Revenue'].iloc[0] if 'Cost Of Revenue' in financials.index else None
+        pretax_income = financials.loc['Pretax Income'].iloc[0] if 'Pretax Income' in financials.index else None   
+
+        # Data from Balance Sheets
+        total_assets = balance_sheet.loc['Total Assets'].iloc[0] if 'Total Assets' in balance_sheet.index else None
+        total_liabilities = balance_sheet.loc['Total Liabilities Net Minority Interest'].iloc[0] if 'Total Liabilities Net Minority Interest' in balance_sheet.index else None
+        total_assets_t1 = balance_sheet.loc['Total Assets'].iloc[1] if 'Total Assets' in balance_sheet.index else None
+        total_liabilities_t1 = balance_sheet.loc['Total Liabilities Net Minority Interest'].iloc[1] if 'Total Liabilities Net Minority Interest' in balance_sheet.index else None
+        total_debt = balance_sheet.loc['Total Debt'].iloc[0] if 'Total Debt' in balance_sheet.index else None
+        shareholder_equity = balance_sheet.loc['Stockholders Equity'].iloc[0] if 'Stockholders Equity' in balance_sheet.index else None
+        current_assets = balance_sheet.loc['Current Assets'].iloc[0] if 'Current Assets' in balance_sheet.index else None
+        current_liabilities = balance_sheet.loc['Current Liabilities'].iloc[0] if 'Current Liabilities' in balance_sheet.index else None
+        inventory = balance_sheet.loc['Inventory'].iloc[0] if 'Inventory' in balance_sheet.index else None
+        invested_capital = balance_sheet.loc['Invested Capital'].iloc[0] if 'Invested Capital' in balance_sheet.index else None
+        tax_payable = balance_sheet.loc['Total Tax Payable'].iloc[0] if 'Total Tax Payable' in balance_sheet.index else None
+
+        # Data from Cashflow
+        cash_from_operations = cashflow.loc["Total Cash From Operating Activities"].iloc[0] if "Total Cash From Operating Activities" in cashflow.index else None
+        capital_expenditures = cashflow.loc["Capital Expenditures"].iloc[0] if "Capital Expenditures" in cashflow.index else None
+
+        # Stock Info with Replacements
+        current_ratio = info.get('currentRatio', current_assets / current_liabilities if current_assets and current_liabilities else None)
+        quick_ratio = info.get('quickRatio',(current_assets - inventory) / current_liabilities if current_assets and inventory else None)
+        debt_to_equity = info.get('debtToEquity',total_liabilities / shareholder_equity if total_liabilities and shareholder_equity else None)
+        free_cash_flow = info.get('freeCashflow', (
+                cash_from_operations - capital_expenditures
+                if cash_from_operations is not None and capital_expenditures is not None
+                else None
+            )
         )
-    data = response.json()
-    financial_metrics = data.get("financial_metrics")
-    if not financial_metrics:
-        raise ValueError("No financial metrics returned")
-    return financial_metrics
+
+        # Manual Calculations
+        tax_rate = tax_payable / pretax_income
+        book_value = total_assets - total_liabilities
+        book_value_t1 = total_assets_t1 - total_liabilities_t1
+        asset_turnover = revenue / total_assets if revenue and total_assets else None
+        inventory_turnover = cost_of_revenue / inventory if cost_of_revenue and inventory else None
+        cash_ratio =  cash / current_liabilities if cash and current_liabilities else None
+        debt_to_assets = total_liabilities / total_assets if total_liabilities and total_assets else None
+        nopat = operating_income * (1 - tax_rate) if operating_income is not None else None # Calculate NOPAT (Net Operating Profit After Tax)
+        return_on_invested_capital = nopat / invested_capital if nopat is not None and invested_capital is not None else None
+        book_value_growth = book_value/book_value_t1 - 1  # Placeholder for further logic
+        free_cash_flow_per_share = (
+            free_cash_flow / shares_outstanding
+            if free_cash_flow is not None and shares_outstanding is not None
+            else None
+        )
+
+
+        # Assemble data into required structure
+        metrics = {
+            "ticker": ticker,
+            "currency": info.get('currency', None),
+            "market_cap": market_cap,
+            "enterprise_value": enterprise_value,
+            "price_to_earnings_ratio": price_to_earnings_ratio,
+            "price_to_book_ratio": price_to_book_ratio,
+            "price_to_sales_ratio": price_to_sales_ratio,
+            "enterprise_value_to_ebitda_ratio": enterprise_value_to_ebitda_ratio,
+            "enterprise_value_to_revenue_ratio": enterprise_value_to_revenue_ratio,
+            "gross_margin": gross_margin,
+            "operating_margin": operating_margin,
+            "net_margin": net_margin,
+            "return_on_equity": return_on_equity,
+            "return_on_assets": return_on_assets,
+            "return_on_invested_capital": return_on_invested_capital,
+            "asset_turnover": asset_turnover,
+            "inventory_turnover": inventory_turnover,
+            "current_ratio": current_ratio,
+            "quick_ratio": quick_ratio,
+            "cash_ratio": cash_ratio,
+            "debt_to_equity": debt_to_equity,
+            "debt_to_assets": debt_to_assets,
+            "revenue_growth": revenue_growth,
+            "earnings_growth": earnings_growth,
+            "book_value_growth": book_value_growth,
+            "payout_ratio": payout_ratio,
+            "earnings_per_share": earnings_per_share,
+            "book_value_per_share": book_value_per_share,
+            "free_cash_flow_per_share": free_cash_flow_per_share,
+        }
+        return [metrics]
+    except Exception as e:
+        print(f"Error fetching metrics for {ticker}: {e}")
+        return None
 
 def get_cash_flow_statements(ticker: str):
     try:
@@ -204,8 +301,7 @@ def get_prices(
                 "time": index.strftime('%Y-%m-%dT%H:%M:%S')  # Use ISO 8601 format for time
             }
             prices.append(price)
-
-        return {"prices": prices}
+        return prices
 
     except Exception as e:
         # General exception handling

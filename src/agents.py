@@ -9,7 +9,7 @@ import argparse
 from datetime import datetime
 import json
 
-llm = Ollama(model="llama2",base_url="http://ollama:11434")
+llm = Ollama(model="llama3.2",base_url="http://ollama:11434")
 
 def merge_dicts(a: Dict[str, Any], b: Dict[str, Any]) -> Dict[str, Any]:
     return {**a, **b}
@@ -44,14 +44,9 @@ def market_data_agent(state: AgentState):
         end_date=end_date,
     )
 
-    prices = prices.get('prices', []) #Structured as List like the previous Output
-
     # Get the financial metrics
     financial_metrics = get_financial_metrics(
-        ticker=data["ticker"], 
-        report_period=end_date, 
-        period='ttm', 
-        limit=1,
+        ticker=data["ticker"]
     )
 
     # Get the insider trades
@@ -405,7 +400,9 @@ def risk_management_agent(state: AgentState):
                 "system",
                 """You are a risk management specialist.
                 Your job is to take a look at the trading analysis and
-                evaluate portfolio exposure and recommend position sizing.
+                evaluate portfolio exposure and recommend position sizing. 
+                Please take for the Sentiment Analysis Trading Signal into account that the
+                sentiment of high-level executives weighs more for the decision of the overall sentiment.
                 Provide the following in your output (as a JSON):
                 "max_position_size": <float greater than 0>,
                 "risk_score": <integer between 1 and 10>,
