@@ -8,20 +8,16 @@ def valuation_agent(state: AgentState):
     data = state["data"]
     metrics = data["financial_metrics"][0]
     current_financial_line_item = data["financial_line_items"][0]
-    previous_financial_line_item = data["financial_line_items"][1]
     market_cap = data["market_cap"]
 
     reasoning = {}
 
-    # Calculate working capital change
-    working_capital_change = current_financial_line_item.get('working_capital', 0) - previous_financial_line_item.get('working_capital', 0)
-    
     # Owner Earnings Valuation (Buffett Method)
     owner_earnings_value = calculate_owner_earnings_value(
         net_income=current_financial_line_item.get('net_income'),
         depreciation=current_financial_line_item.get('depreciation_and_amortization'),
         capex=current_financial_line_item.get('capital_expenditure'),
-        working_capital_change=working_capital_change,
+        working_capital_change=current_financial_line_item.get('change_in_working_capital'),
         growth_rate=metrics["earnings_growth"],
         required_return=0.15,
         margin_of_safety=0.25
@@ -169,21 +165,3 @@ def calculate_intrinsic_value(
     dcf_value = sum(present_values) + terminal_present_value
 
     return dcf_value
-
-def calculate_working_capital_change(
-    current_working_capital: float,
-    previous_working_capital: float,
-) -> float:
-    """
-    Calculate the absolute change in working capital between two periods.
-    A positive change means more capital is tied up in working capital (cash outflow).
-    A negative change means less capital is tied up (cash inflow).
-    
-    Args:
-        current_working_capital: Current period's working capital
-        previous_working_capital: Previous period's working capital
-    
-    Returns:
-        float: Change in working capital (current - previous)
-    """
-    return current_working_capital - previous_working_capital
