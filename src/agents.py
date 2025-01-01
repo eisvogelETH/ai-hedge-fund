@@ -3,13 +3,19 @@ import operator
 from langchain_core.messages import BaseMessage, HumanMessage
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_community.llms import Ollama
+from langchain_openai.chat_models import ChatOpenAI
 from langgraph.graph import END, StateGraph
 from src.tools import calculate_bollinger_bands, calculate_intrinsic_value, calculate_macd, calculate_obv, calculate_rsi, get_cash_flow_statements, get_financial_metrics, get_insider_trades, get_market_cap, get_prices, prices_to_df
 import argparse
 from datetime import datetime
 import json
+from dotenv import load_dotenv
+load_dotenv()
 
-llm = Ollama(model="llama3.2",base_url="http://ollama:11434")
+#use_local_llm=True
+use_local_llm=False
+#llm = Ollama(model="llama3.2", base_url="http://ollama:11434")
+llm = ChatOpenAI(model="gpt-3.5-turbo")
 
 def merge_dicts(a: Dict[str, Any], b: Dict[str, Any]) -> Dict[str, Any]:
     return {**a, **b}
@@ -28,12 +34,31 @@ def market_data_agent(state: AgentState):
 
     # Set default dates
     end_date = data["end_date"] or datetime.now().strftime('%Y-%m-%d')
+
     if not data["start_date"]:
         # Calculate 3 months before end_date
         end_date_obj = datetime.strptime(end_date, '%Y-%m-%d')
-        start_date = end_date_obj.replace(month=end_date_obj.month - 3) if end_date_obj.month > 3 else \
-            end_date_obj.replace(year=end_date_obj.year - 1, month=end_date_obj.month + 9)
-        start_date = start_date.strftime('%Y-%m-%d')
+        
+        if end_date_obj.month > 3:
+            # If the month is greater than 3, subtract 3 months
+            start_month = end_date_obj.month - 3
+            start_year = end_date_obj.year
+        else:
+            # If the month is less than or equal to 3, subtract 1 year and add 9 months
+            start_month = end_date_obj.month + 9
+            start_year = end_date_obj.year - 1
+
+        try:
+            # Create the start date safely using the calculated month and year
+            start_date_obj = end_date_obj.replace(year=start_year, month=start_month)
+        except ValueError:
+            # Handle the case where the day is out of range for the calculated month
+            print(f"Error: Invalid date created for {start_month}/{start_year}. Adjusting...")
+            # Default to the first day of the new month to avoid "day out of range" error
+            start_date_obj = end_date_obj.replace(year=start_year, month=start_month, day=1)
+
+        # Convert the start date object to string
+        start_date = start_date_obj.strftime('%Y-%m-%d')
     else:
         start_date = data["start_date"]
 
@@ -361,7 +386,8 @@ def sentiment_agent(state: AgentState):
 
     # Extract the sentiment and reasoning from the result, safely
     try:
-        message_content = json.loads(json.dumps(result))  # Try parsing JSON if the response is JSON-formatted
+        message_content = json.dumps(result if use_local_llm else result.content)
+  # Try parsing JSON if the response is JSON-formatted
     except json.JSONDecodeError:
         message_content = {"sentiment": "neutral", "reasoning": "Unable to parse JSON output of market sentiment analysis"}  # Otherwise, just use the string response
 
@@ -438,7 +464,7 @@ def risk_management_agent(state: AgentState):
     # Invoke the LLM
     result = llm.invoke(prompt)
     message = HumanMessage(
-        content=result,
+        content=result if use_local_llm else result.content,
         name="risk_management_agent",
     )
 
@@ -517,7 +543,7 @@ def portfolio_management_agent(state: AgentState):
 
     # Create the portfolio management message
     message = HumanMessage(
-        content=result,
+        content=result if use_local_llm else result.content,
         name="portfolio_management",
     )
 
@@ -543,7 +569,7 @@ def show_agent_reasoning(output, agent_name):
     print("=" * 48)
 
 ##### Run the Hedge Fund #####
-def run_hedge_fund(ticker: str, start_date: str, end_date: str, portfolio: dict, show_reasoning: bool = False):
+def run_hedge_fund(ticker: str, start_date: str, end_date: str, portfolio: dict, show_reasoning: bool = False, llm: ChatOpenAI = ChatOpenAI(model="gpt-3.5-turbo")):
     final_state = app.invoke(
         {
             "messages": [
@@ -590,14 +616,25 @@ app = workflow.compile()
 
 # Add this at the bottom of the file
 if __name__ == "__main__":
+    # Initialize the argument parser
     parser = argparse.ArgumentParser(description='Run the hedge fund trading system')
+
+    # Existing arguments
     parser.add_argument('--ticker', type=str, required=True, help='Stock ticker symbol')
     parser.add_argument('--start-date', type=str, help='Start date (YYYY-MM-DD). Defaults to 3 months before end date')
     parser.add_argument('--end-date', type=str, help='End date (YYYY-MM-DD). Defaults to today')
     parser.add_argument('--show-reasoning', action='store_true', help='Show reasoning from each agent')
-    
+    parser.add_argument('--use-local-llm', action='store_true', default=False, help='Use local LLM (Ollama). Defaults to False')
+    # Parse the arguments
     args = parser.parse_args()
-    
+    # Assign use_local_llm from parsed arguments
+    use_local_llm = args.use_local_llm  # This will be True if --use-local-llm is provided, else False
+    # Conditional model selection
+    if use_local_llm:
+        llm = Ollama(model="llama3.2", base_url="http://ollama:11434")
+    else:
+        llm = ChatOpenAI(model="gpt-3.5-turbo")
+
     # Validate dates if provided
     if args.start_date:
         try:

@@ -244,13 +244,11 @@ def get_insider_trades(
             insider_trades.append(trade)
 
         return insider_trades
-
-    except ValueError as e:
-        # If no insider trades are found or another error occurs, raise an exception
-        raise ValueError("No insider trades returned") from e
+        
     except Exception as e:
-        # General exception handling
-        raise Exception(f"An error occurred while processing insider data: {str(e)}") from e
+        # In case of any other error, print the error and return an empty list
+        print(f"An error occurred while fetching insider trades: {str(e)}")
+        return []  # Return an empty list when there's an error
 
 def get_market_cap(ticker: str) -> List[Dict[str, Any]]:
     try:
