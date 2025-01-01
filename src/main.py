@@ -15,7 +15,7 @@ from datetime import datetime
 
 
 ##### Run the Hedge Fund #####
-def run_hedge_fund(ticker: str, start_date: str, end_date: str, portfolio: dict, show_reasoning: bool = False):
+def run_hedge_fund(ticker: str, start_date: str, end_date: str, portfolio: dict, show_reasoning: bool = False, use_local_llm: bool = False):
     final_state = app.invoke(
         {
             "messages": [
@@ -31,6 +31,7 @@ def run_hedge_fund(ticker: str, start_date: str, end_date: str, portfolio: dict,
             },
             "metadata": {
                 "show_reasoning": show_reasoning,
+                "use_local_llm": use_local_llm
             }
         },
     )
@@ -70,6 +71,7 @@ if __name__ == "__main__":
     parser.add_argument('--start-date', type=str, help='Start date (YYYY-MM-DD). Defaults to 3 months before end date')
     parser.add_argument('--end-date', type=str, help='End date (YYYY-MM-DD). Defaults to today')
     parser.add_argument('--show-reasoning', action='store_true', help='Show reasoning from each agent')
+    parser.add_argument('--local-llm', action='store_true', default=False, help='Decide whether to use local LLM or OpenAI (defaults to OpenAI)')
     
     args = parser.parse_args()
     
@@ -97,7 +99,8 @@ if __name__ == "__main__":
         start_date=args.start_date,
         end_date=args.end_date,
         portfolio=portfolio,
-        show_reasoning=args.show_reasoning
+        show_reasoning=args.show_reasoning,
+        use_local_llm=args.local_llm
     )
     print("\nFinal Result:")
     print(result)

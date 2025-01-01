@@ -1,6 +1,7 @@
 from langchain_core.messages import HumanMessage
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_openai.chat_models import ChatOpenAI
+from langchain_community.llms import Ollama
 
 from agents.state import AgentState, show_agent_reasoning
 
@@ -9,6 +10,7 @@ from agents.state import AgentState, show_agent_reasoning
 def portfolio_management_agent(state: AgentState):
     """Makes final trading decisions and generates orders"""
     show_reasoning = state["metadata"]["show_reasoning"]
+    use_local_llm = state["metadata"]["use_local_llm"]
     portfolio = state["data"]["portfolio"]
 
     # Get the technical analyst, fundamentals agent, and risk management agent messages
@@ -108,12 +110,12 @@ def portfolio_management_agent(state: AgentState):
         }
     )
     # Invoke the LLM
-    llm = ChatOpenAI(model="gpt-4o")
+    llm = Ollama(model="llama3.2", base_url="http://ollama:11434") if use_local_llm else ChatOpenAI(model="gpt-4o")
     result = llm.invoke(prompt)
 
     # Create the portfolio management message
     message = HumanMessage(
-        content=result.content,
+        content=result if use_local_llm else result.content,
         name="portfolio_management",
     )
 
