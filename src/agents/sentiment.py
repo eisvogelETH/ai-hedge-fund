@@ -16,12 +16,15 @@ def sentiment_agent(state: AgentState):
     insider_trades = data["insider_trades"]
     show_reasoning = state["metadata"]["show_reasoning"]
 
-    # Loop through the insider trades, if transaction_shares is negative, then it is a sell, which is bearish, if positive, then it is a buy, which is bullish
-
     # Get the signals from the insider trades
-    transaction_shares = pd.Series([t['transaction_shares'] for t in insider_trades]).dropna()
-    bearish_condition = transaction_shares < 0
-    signals = np.where(bearish_condition, "bearish", "bullish").tolist()
+    signals = []
+    for trade in insider_trades:
+        if trade['transaction_type'] == 'sell':
+            signals.append("bearish")
+        elif trade['transaction_type'] == 'buy':
+            signals.append("bullish")
+        else:
+            signals.append("neutral")
 
     # Determine overall signal
     bullish_signals = signals.count("bullish")
