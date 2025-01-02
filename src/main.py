@@ -71,10 +71,10 @@ if __name__ == "__main__":
     parser.add_argument('--start-date', type=str, help='Start date (YYYY-MM-DD). Defaults to 3 months before end date')
     parser.add_argument('--end-date', type=str, help='End date (YYYY-MM-DD). Defaults to today')
     parser.add_argument('--show-reasoning', action='store_true', help='Show reasoning from each agent')
-    parser.add_argument('--local-llm', action='store_true', default=False, help='Decide whether to use local LLM or OpenAI (defaults to OpenAI)')
+    parser.add_argument('--local-llm', action='store_true', help='Decide whether to use local LLM or OpenAI (defaults to OpenAI)')
     
     args = parser.parse_args()
-    
+
     # Validate dates if provided
     if args.start_date:
         try:

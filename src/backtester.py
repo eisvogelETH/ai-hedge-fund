@@ -7,11 +7,12 @@ from main import run_hedge_fund
 from tools.api import get_price_data
 
 class Backtester:
-    def __init__(self, agent, ticker, start_date, end_date, initial_capital):
+    def __init__(self, agent, ticker, start_date, end_date, initial_capital,use_local_llm):
         self.agent = agent
         self.ticker = ticker
         self.start_date = start_date
         self.end_date = end_date
+        self.use_local_llm = use_local_llm
         self.initial_capital = initial_capital
         self.portfolio = {"cash": initial_capital, "stock": 0}
         self.portfolio_values = []
@@ -66,7 +67,8 @@ class Backtester:
                 ticker=self.ticker,
                 start_date=lookback_start,
                 end_date=current_date_str,
-                portfolio=self.portfolio
+                portfolio=self.portfolio,
+                use_local_llm=self.use_local_llm
             )
 
             action, quantity = self.parse_action(agent_output)
@@ -136,6 +138,7 @@ if __name__ == "__main__":
     parser.add_argument('--end-date', type=str, default=datetime.now().strftime('%Y-%m-%d'), help='End date in YYYY-MM-DD format')
     parser.add_argument('--start-date', type=str, default=(datetime.now() - timedelta(days=90)).strftime('%Y-%m-%d'), help='Start date in YYYY-MM-DD format')
     parser.add_argument('--initial-capital', type=float, default=100000, help='Initial capital amount (default: 100000)')
+    parser.add_argument('--local-llm', action='store_true', help='Decide whether to use local LLM or OpenAI (defaults to OpenAI)')
 
     args = parser.parse_args()
 
@@ -146,6 +149,7 @@ if __name__ == "__main__":
         start_date=args.start_date,
         end_date=args.end_date,
         initial_capital=args.initial_capital,
+        use_local_llm=args.local_llm,
     )
 
     # Run the backtesting process
